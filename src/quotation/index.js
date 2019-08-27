@@ -1,9 +1,25 @@
-// @flow
-import fetch from 'node-fetch';
-import WebSocket from 'ws';
-import { HOST, WSS_HOST, DEFAULT_MARKET, subscription } from '../constants';
-import type { SubscriptionOption, TimeUnit, Minute, Market, Candle, Tick, Orderbook, MarketInfo } from '../type';
-import { handleWsOpen, handleWsError, handleWsClose, getEndpoint, serializeArray } from '../utils';
+"use strict";
+
+var _interopRequireDefault = require("@babel/runtime-corejs2/helpers/interopRequireDefault");
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.getOrderbook = exports.getTick = exports.getCandles = exports.getMinCandles = exports.getTicker = exports.subscribe = void 0;
+
+var _asyncToGenerator2 = _interopRequireDefault(require("@babel/runtime-corejs2/helpers/asyncToGenerator"));
+
+var _nodeFetch = _interopRequireDefault(require("node-fetch"));
+
+var _ws = _interopRequireDefault(require("ws"));
+
+var _constants = require("../constants");
+
+var _utils = require("../utils");
+
+var Queue = require('bull');
+
+var awsConfig = require('../../../../src/common/aws_config');
 
 /**
  * Get websocket instance to subscribe websocket protocol
@@ -12,22 +28,24 @@ import { handleWsOpen, handleWsError, handleWsClose, getEndpoint, serializeArray
  * @param {Function} options.reconnect - Callback that is executed when try to reconnect to websocket
  * @param {Function} options.openCallback - Callback that is executed when websocket is opened
  * @param {Function} options.messageCallback - Callback that is executed when message is received
- * @param {Object} options.subscriptionList - List that you want to subscribe
  * @return {Object} ws - instance of WebSocket
  */
-export const subscribe: Function = (options: SubscriptionOption): void => {
-  const ws = new WebSocket(WSS_HOST);
-
-  const { reconnect, openCallback, messageCallback, subscriptionList } = options;
+const subscribe = options => {
+  const ws = new _ws.default(_constants.WSS_HOST);
+  const reconnect = options.reconnect,
+        openCallback = options.openCallback,
+        messageCallback = options.messageCallback,
+        subscriptionList = options.subscriptionList;
   ws.reconnect = !!reconnect;
-  ws.endpoint = WSS_HOST;
+  ws.endpoint = _constants.WSS_HOST;
   ws.isAlive = false;
-
-  ws.on('open', handleWsOpen.bind(ws, WSS_HOST, subscription, subscriptionList, openCallback));
-  ws.on('pong', () => { ws.isAlive = true; });
-  ws.on('error', handleWsError);
-  ws.on('close', handleWsClose.bind(ws, subscription, reconnect));
-  ws.on('message', (data: any): void => {
+  ws.on('open', _utils.handleWsOpen.bind(ws, _constants.WSS_HOST, _constants.subscription, subscriptionList, openCallback));
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
+  ws.on('error', _utils.handleWsError);
+  ws.on('close', _utils.handleWsClose.bind(ws, _constants.subscription, reconnect));
+  ws.on('message', data => {
     if (typeof messageCallback === 'function') {
       try {
         messageCallback(JSON.parse(data));
@@ -36,28 +54,36 @@ export const subscribe: Function = (options: SubscriptionOption): void => {
       }
     }
   });
-
   return ws;
 };
-
 /**
  * Get tickers of given markets
  * https://api.upbit.com/v1/ticker?markets=KRW-BTC
  *
  * @async
- * @param {String[]} markets - Element should folow AAA-BBB
+ * @param {Object[]} markets - Element should folow AAA-BBB
  * @return {Promise<Object>}
  */
-export const getTicker: Function = async (markets: Array<string> = [DEFAULT_MARKET]): Promise<Array<Market>> => {
-  const pathname: string = 'ticker';
-  const qs: string = `markets=${serializeArray(markets, (_: string): string => _.toUpperCase())}`;
-  const endpoint: string = getEndpoint(HOST, pathname, qs);
-  const result: Response = await fetch(endpoint);
-  const data: Array<Market> = await result.json();
 
-  return data;
-};
 
+exports.subscribe = subscribe;
+
+const getTicker =
+/*#__PURE__*/
+function () {
+  var _ref = (0, _asyncToGenerator2.default)(function* (markets = [_constants.DEFAULT_MARKET]) {
+    const pathname = 'ticker';
+    const qs = `markets=${(0, _utils.serializeArray)(markets, _ => _.toUpperCase())}`;
+    const endpoint = (0, _utils.getEndpoint)(_constants.HOST, pathname, qs);
+    const result = yield (0, _nodeFetch.default)(endpoint);
+    const data = yield result.json();
+    return data;
+  });
+
+  return function getTicker() {
+    return _ref.apply(this, arguments);
+  };
+}();
 /**
  * Get candles of given market (time unit: minutes)
  * https://api.upbit.com/v1/candles/minutes/5?market=KRW-BTC&count=3
@@ -68,20 +94,30 @@ export const getTicker: Function = async (markets: Array<string> = [DEFAULT_MARK
  * @param {Number} count - Numbers of candle count you want. 1 - 200
  * @return {Promise<Object>}
  */
-export const getMinCandles: Function = async (market: string = DEFAULT_MARKET, minutes: Minute = 5, count: number = 3): Promise<Array<Candle>> => {
-  if (count > 200) {
-    throw new Error(`Invalid data for count. ${count} must under 200`);
-  }
 
-  const pathname: string = `candles/minutes/${minutes}`;
-  const qs: string = `market=${market.toUpperCase()}&count=${count}`;
-  const endpoint: string = getEndpoint(HOST, pathname, qs);
-  const result: Response = await fetch(endpoint);
-  const data: Array<Candle> = await result.json();
 
-  return data;
-};
+exports.getTicker = getTicker;
 
+const getMinCandles =
+/*#__PURE__*/
+function () {
+  var _ref2 = (0, _asyncToGenerator2.default)(function* (market = _constants.DEFAULT_MARKET, minutes = 5, count = 3) {
+    if (count > 200) {
+      throw new Error(`Invalid data for count. ${count} must under 200`);
+    }
+
+    const pathname = `candles/minutes/${minutes}`;
+    const qs = `market=${market.toUpperCase()}&count=${count}`;
+    const endpoint = (0, _utils.getEndpoint)(_constants.HOST, pathname, qs);
+    const result = yield (0, _nodeFetch.default)(endpoint);
+    const data = yield result.json();
+    return data;
+  });
+
+  return function getMinCandles() {
+    return _ref2.apply(this, arguments);
+  };
+}();
 /**
  * Get candles of given market (time unit: day | week | month)
  * https://api.upbit.com/v1/candles/days?market=KRW-BTC&count=3
@@ -92,20 +128,30 @@ export const getMinCandles: Function = async (market: string = DEFAULT_MARKET, m
  * @param {Number} count - Numbers of candle count you want. 1 - 200
  * @return {Promise<Object>}
  */
-export const getCandles: Function = async (market: string = DEFAULT_MARKET, timeUnit: TimeUnit = 'days', count: number = 3): Promise<Array<Candle>> => {
-  if (count > 200) {
-    throw new Error(`Invalid data for count. ${count} must under 200`);
-  }
 
-  const pathname: string = `candles/${timeUnit}`;
-  const qs: string = `market=${market.toUpperCase()}&count=${count}`;
-  const endpoint: string = getEndpoint(HOST, pathname, qs);
-  const result: Response = await fetch(endpoint);
-  const data: Array<Candle> = await result.json();
 
-  return data;
-};
+exports.getMinCandles = getMinCandles;
 
+const getCandles =
+/*#__PURE__*/
+function () {
+  var _ref3 = (0, _asyncToGenerator2.default)(function* (market = _constants.DEFAULT_MARKET, timeUnit = 'days', count = 3) {
+    if (count > 200) {
+      throw new Error(`Invalid data for count. ${count} must under 200`);
+    }
+
+    const pathname = `candles/${timeUnit}`;
+    const qs = `market=${market.toUpperCase()}&count=${count}`;
+    const endpoint = (0, _utils.getEndpoint)(_constants.HOST, pathname, qs);
+    const result = yield (0, _nodeFetch.default)(endpoint);
+    const data = yield result.json();
+    return data;
+  });
+
+  return function getCandles() {
+    return _ref3.apply(this, arguments);
+  };
+}();
 /**
  * Get Tick price of given market
  * https://api.upbit.com/v1/trades/ticks?market=KRW-BTC&count=3
@@ -115,47 +161,54 @@ export const getCandles: Function = async (market: string = DEFAULT_MARKET, time
  * @param {Number} count - Numbers of candle count you want. 1 - 200
  * @return {Promise<Object>}
  */
-export const getTick: Function = async (market: string = DEFAULT_MARKET, count: number = 3): Promise<Array<Tick>> => {
-  const pathname: string = 'trades/ticks';
-  const qs: string = `market=${market.toUpperCase()}&count=${count}`;
-  const endpoint: string = getEndpoint(HOST, pathname, qs);
-  const result: Response = await fetch(endpoint);
-  const data: Array<Tick> = await result.json();
 
-  return data;
-};
 
+exports.getCandles = getCandles;
+
+const getTick =
+/*#__PURE__*/
+function () {
+  var _ref4 = (0, _asyncToGenerator2.default)(function* (market = _constants.DEFAULT_MARKET, count = 3) {
+    const pathname = 'trades/ticks';
+    const qs = `market=${market.toUpperCase()}&count=${count}`;
+    const endpoint = (0, _utils.getEndpoint)(_constants.HOST, pathname, qs);
+    const result = yield (0, _nodeFetch.default)(endpoint);
+    const data = yield result.json();
+    return data;
+  });
+
+  return function getTick() {
+    return _ref4.apply(this, arguments);
+  };
+}();
 /**
  * Get Orderbook of given market
  * https://api.upbit.com/v1/orderbook?markets=KRW-BTC
  *
  * @async
- * @param {String[]} markets - Element should folow AAA-BBB
+ * @param {Object[]} markets - Element should folow AAA-BBB
  * @param {Number} count - Numbers of candle count you want. 1 - 200
  * @return {Promise<Object>}
  */
-export const getOrderbook: Function = async (markets: Array<string> = [DEFAULT_MARKET]): Promise<Array<Orderbook>> => {
-  const pathname: string = 'orderbook';
-  const qs: string = `markets=${serializeArray(markets, (_: string): string => _.toUpperCase())}`;
-  const endpoint: string = getEndpoint(HOST, pathname, qs);
-  const result: Response = await fetch(endpoint);
-  const data: Array<Orderbook> = await result.json();
 
-  return data;
-};
 
-/**
- * Get list of markets available
- * https://api.upbit.com/v1/market/all
- *
- * @async
- * @return {Promise<Object>}
- */
-export const getMarketList: Function = async (): Promise<Array<MarketInfo>> => {
-  const pathname: string = 'market/all';
-  const endpoint: string = getEndpoint(HOST, pathname, '');
-  const result: Response = await fetch(endpoint);
-  const data: Array<MarketInfo> = await result.json();
+exports.getTick = getTick;
 
-  return data;
-};
+const getOrderbook =
+/*#__PURE__*/
+function () {
+  var _ref5 = (0, _asyncToGenerator2.default)(function* (markets = [_constants.DEFAULT_MARKET]) {
+    const pathname = 'orderbook';
+    const qs = `markets=${(0, _utils.serializeArray)(markets, _ => _.toUpperCase())}`;
+    const endpoint = (0, _utils.getEndpoint)(_constants.HOST, pathname, qs);
+    const result = yield (0, _nodeFetch.default)(endpoint);
+    const data = yield result.json();
+    return data;
+  });
+
+  return function getOrderbook() {
+    return _ref5.apply(this, arguments);
+  };
+}();
+
+exports.getOrderbook = getOrderbook;
